@@ -20,6 +20,8 @@ class Households(Agent):
         super().__init__(unique_id, model)
         self.is_adapted = False  # Initial adaptation status set to False
 
+        self.income_class = random.choice(['low', 'middle', 'high'])
+
         # getting flood map values
         # Get a random location on the map
         loc_x, loc_y = generate_random_location_within_map_domain()

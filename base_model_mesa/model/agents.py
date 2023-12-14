@@ -16,12 +16,19 @@ class Households(Agent):
     In a real scenario, this would be based on actual geographical data or more complex logic.
     """
 
-    def __init__(self, unique_id, model):
+    def __init__(self, unique_id, model, income_class_usage = True):
         super().__init__(unique_id, model)
         self.is_adapted = False  # Initial adaptation status set to False
 
-        self.income_class = random.choice(['low', 'middle', 'high'])
 
+        if income_class_usage:
+        # self.income_class = random.choice(['low', 'middle', 'high'])   ## gives random income class to the households
+
+            income_distribution = ['low'] * 20 + ['middle'] * 50 + ['high'] * 30    ## percentage based on literature (see report)
+            random.shuffle(income_distribution)                                     ## assigns random distribution of the values
+            self.income_class = income_distribution.pop()                           ## assigns income_class to agents
+        else:
+            self.income_class = None              #if boolean is off, dont use income class
         # getting flood map values
         # Get a random location on the map
         loc_x, loc_y = generate_random_location_within_map_domain()

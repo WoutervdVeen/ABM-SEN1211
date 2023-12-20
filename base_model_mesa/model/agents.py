@@ -57,6 +57,8 @@ class Households(Agent):
         
         #calculate the actual flood damage given the actual flood depth. Flood damage is a factor between 0 and 1
         self.flood_damage_actual = calculate_basic_flood_damage(flood_depth=self.flood_depth_actual)
+
+        self.likelihood = 0.5                      ##likelihood variable that will impact the chance to get adapted.
     
     # Function to count friends who can be influencial.
     def count_friends(self, radius):
@@ -67,7 +69,8 @@ class Households(Agent):
     def step(self):
         # Logic for adaptation based on estimated flood damage and a random chance.
         # These conditions are examples and should be refined for real-world applications.
-        if self.flood_damage_estimated > 0.15 and random.random() < 0.2:
+        # if self.flood_damage_estimated > 0.15 and random.random() < 0.2               ##Orginal code
+        if self.flood_damage_estimated > 0.15 and self.likelihood + random.random() > 1:
             self.is_adapted = True  # Agent adapts to flooding
         
 # Define the Government agent class

@@ -30,6 +30,19 @@ class Households(Agent):
         else:
             self.income_class = None              #if boolean is off, dont use income class
 
+
+        self.base_likelihood = 0.5  ##base likelihood variable that will impact the chance to get adapted. The likelihood gets affected by the income class of a household.
+
+        ## to determine the likelihood per income class, for all the reasoning behind the chosen values see chapter ....
+        self.income_likelihood = {
+            'lower': 0.3,
+            'lower-middle': 0.4,
+            'middle': 0.5,
+            'upper-middle': 0.6,              # very likely to
+            'upper': 0.8                      # Super rich
+        }
+
+
         # getting flood map values
         # Get a random location on the map
         loc_x, loc_y = generate_random_location_within_map_domain()
@@ -58,7 +71,7 @@ class Households(Agent):
         #calculate the actual flood damage given the actual flood depth. Flood damage is a factor between 0 and 1
         self.flood_damage_actual = calculate_basic_flood_damage(flood_depth=self.flood_depth_actual)
 
-        self.likelihood = 0.5                      ##likelihood variable that will impact the chance to get adapted.
+
     
     # Function to count friends who can be influencial.
     def count_friends(self, radius):
@@ -69,9 +82,15 @@ class Households(Agent):
     def step(self):
         # Logic for adaptation based on estimated flood damage and a random chance.
         # These conditions are examples and should be refined for real-world applications.
-        # if self.flood_damage_estimated > 0.15 and random.random() < 0.2               ##Orginal code
-        if self.flood_damage_estimated > 0.15 and self.likelihood + random.random() > 1:
-            self.is_adapted = True  # Agent adapts to flooding
+        # if self.flood_damage_estimated > 0.15 and random.random() < 0.2                     ##Orginal code
+        if self.flood_damage_estimated > 0.15:
+            if self.income_class in self.income_likelihood:
+                likelihood = self.income_likelihood[self.income_class]
+            else:
+                likelihood = self.base_likelihood
+
+            if likelihood + 0.5 > 1: #random.random() > 1:
+                self.is_adapted = True  # Agent adapts to flooding
         
 # Define the Government agent class
 class Government(Agent):

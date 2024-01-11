@@ -19,8 +19,9 @@ class Households(Agent):
     def __init__(self, unique_id, model, income_class_usage = True):
         super().__init__(unique_id, model)
         self.is_adapted = False  # Initial adaptation status set to False
-
-
+        self.final_adaption = False # this boolean makes sure that once an adaption has been made, it doesnt go on adapting again and again
+        self.in_danger = False # there is no flood damage estimated yet, no reason to adapt
+        self.reduction = 0
         if income_class_usage:
         # self.income_class = random.choice(['low', 'middle', 'high'])   ## gives random income class to the households
 
@@ -82,16 +83,69 @@ class Households(Agent):
     def step(self):
         # Logic for adaptation based on estimated flood damage and a random chance.
         # These conditions are examples and should be refined for real-world applications.
-        # if self.flood_damage_estimated > 0.15 and random.random() < 0.2                     ##Orginal code
-        if self.flood_damage_estimated > 0.15:
-            if self.income_class in self.income_likelihood:
-                likelihood = self.income_likelihood[self.income_class]
-            else:
-                likelihood = self.base_likelihood
 
-            if likelihood + 0.5 > 1: #random.random() > 1:
-                self.is_adapted = True  # Agent adapts to flooding
-        
+
+
+        if self.flood_damage_estimated > 0.15 and not self.is_adapted:
+            self.in_danger = True
+            if random.random() < 0.2:                     ##Orginal code
+                self.is_adapted = True
+
+        # This code makes agents adapted based on their likeliness, based on their income class, it is not good yet.
+
+        # if self.flood_damage_estimated > 0.15:
+        #     self.in_danger = True              #
+        #     if self.income_class in self.income_likelihood:
+        #         likelihood = self.income_likelihood[self.income_class]
+        #     else:
+        #         likelihood = self.base_likelihood
+        #
+        #     if likelihood + 0.5 > 1: #random.random() > 1:
+        #         self.is_adapted = True  # Agent adapts to flooding
+        # else:
+        #     self.is_adapted = False
+
+        if self.is_adapted and not self.final_adaption:
+            # Implement logic for buying protection based on income class and adaptation status
+            if self.is_adapted:
+                if self.income_class == 'upper':
+                    # Logic for upper income class to buy a certain protection
+                    self.buy_protection('high_protection')
+                elif self.income_class == 'upper-middle':
+                    # Logic for upper-middle income class to buy a certain protection
+                    self.buy_protection('medium_protection')
+                elif self.income_class in ['middle', 'lower-middle']:
+                    # Logic for middle and lower-middle income class to buy a certain protection
+                    self.buy_protection('basic_protection')
+                elif self.income_class == 'lower':
+                    # Logic for lower income class to buy a certain protection
+                    self.buy_protection('minimal_protection')
+            else:
+                # Logic for households that have not adapted
+                pass
+
+    def buy_protection(self, protection_type):
+        # Define the percentage reduction in flood damage for each protection type
+        damage_reduction = {
+            'high_protection': 0.50,  # 50% reduction for high protection
+            'medium_protection': 0.35,  # 35% reduction for medium protection
+            'basic_protection': 0.20,  # 20% reduction for basic protection
+            'minimal_protection': 0.10  # 10% reduction for minimal protection
+        }
+
+        self.reduction = damage_reduction.get(protection_type, 0)
+
+        # Set the protection type
+        self.protection_type = protection_type
+        # self.final_adaption = True
+
+    # def update_flood_damage(self):
+    #     # Calculate the actual flood depth as a random number between 0.5 and 1.2 times the estimated flood depth
+    #     self.flood_depth_actual = random.uniform(0.5, 1.2) * self.flood_depth_estimated
+    #     # calculate the actual flood damage given the actual flood depth
+    #     agent.flood_damage_actual = calculate_basic_flood_damage(agent.flood_depth_actual)
+
+
 # Define the Government agent class
 class Government(Agent):
     """
@@ -103,5 +157,8 @@ class Government(Agent):
     def step(self):
         # The government agent doesn't perform any actions.
         pass
+
+
+        # if goverment does subsidies: move up all household agents classes by one class.
 
 # More agent classes can be added here, e.g. for insurance agents.

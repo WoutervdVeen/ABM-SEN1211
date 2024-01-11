@@ -85,6 +85,7 @@ class AdaptationModel(Model):
                         "FloodDamageEstimated" : "flood_damage_estimated",
                         "FloodDepthActual": "flood_depth_actual",
                         "FloodDamageActual" : "flood_damage_actual",
+                        "IncomeClass" : "income_class",
                         "IsAdapted": "is_adapted",
                         "FriendsCount": lambda a: a.count_friends(radius=1),
                         "location":"location",
@@ -184,13 +185,27 @@ class AdaptationModel(Model):
         assume local flooding instead of global flooding). The actual flood depth can be 
         estimated differently
         """
+
+        for agent in self.schedule.agents:                                   #each step, the model checks if the agent is adapapted, if it is, it lowers the flood depth estimated and the flood damge estimated
+            if agent.is_adapted and not agent.final_adaption:                #This results in a lower flood depth actual and eventually a lowre flood damge actual
+                agent.flood_depth_estimated *= (1 - agent.reduction)         # this means that investing in good floodadaptions lowers the damages.
+                agent.flood_damage_estimated *= (1 - agent.reduction)
+                agent.final_adaption = True
+            else:
+                continue
+
         if self.schedule.steps == 5:
             for agent in self.schedule.agents:
+
+
                 # Calculate the actual flood depth as a random number between 0.5 and 1.2 times the estimated flood depth
                 agent.flood_depth_actual = random.uniform(0.5, 1.2) * agent.flood_depth_estimated
                 # calculate the actual flood damage given the actual flood depth
                 agent.flood_damage_actual = calculate_basic_flood_damage(agent.flood_depth_actual)
-        
+
+                # if isinstance(agent, Households):
+                #     #call a method in the household class
+                #     agent.update_flood_damage()
         # Collect data and advance the model by one step
         self.datacollector.collect(self)
         self.schedule.step()

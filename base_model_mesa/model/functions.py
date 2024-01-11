@@ -154,6 +154,9 @@ def calculate_basic_flood_damage(flood_depth):
     -------
     flood_damage : damage factor between 0 and 1
     """
+
+
+
     if flood_depth >= 6:
         flood_damage = 1
     elif flood_depth < 0.025:

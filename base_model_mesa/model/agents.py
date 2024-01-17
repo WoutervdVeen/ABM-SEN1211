@@ -16,32 +16,43 @@ class Households(Agent):
     In a real scenario, this would be based on actual geographical data or more complex logic.
     """
 
-    def __init__(self, unique_id, model, income_class_usage = True):
+    _income_classes_initialized = False
+    _income_class_list = []
+    _total_households = 20              # hard coded for now I want this to be a global, will do later
+
+    @classmethod                           # class method
+    def generate_income_class(cls):
+        if not cls._income_classes_initialized:
+            # Calculate the number of households for each income class
+            distribution = {
+                'lower': 0.20,  # 20%
+                'lower-middle': 0.25,  # 25%
+                'middle': 0.25,  # 25%
+                'upper-middle': 0.15,  # 15%
+                'upper': 0.15   # 15%
+            }
+            income_distribution = []
+            for income_class, percentage in distribution.items():                #This function makes sure that the percentage per class is represented in the households.
+                count = int(percentage * cls._total_households)                  # But making a list and the popping, it is possible to create the wanted amount per class.
+                income_distribution.extend([income_class] * count)
+
+            random.shuffle(income_distribution)
+            cls._income_class_list = income_distribution
+            cls._income_classes_initialized = True
+
+        return cls._income_class_list.pop() if cls._income_class_list else 'default'
+
+    def __init__(self, unique_id, model, subsidy=0):
         super().__init__(unique_id, model)
+        self.income_class = Households.generate_income_class()                    # generates income class for each agent in a different function
         self.is_adapted = False  # Initial adaptation status set to False
         self.final_adaption = False # this boolean makes sure that once an adaption has been made, it doesnt go on adapting again and again
         self.in_danger = False # there is no flood damage estimated yet, no reason to adapt
         self.reduction = 0
-        if income_class_usage:
-        # self.income_class = random.choice(['low', 'middle', 'high'])   ## gives random income class to the households
-
-            income_distribution = ['lower'] * 20 + ['lower-middle'] * 25 + ['middle'] * 25 + ['upper-middle'] * 15 + ['upper'] * 15  ## percentage based on literature (see report)
-            random.shuffle(income_distribution)                                     ## assigns random distribution of the values
-            self.income_class = income_distribution.pop()                           ## assigns income_class to agents
-        else:
-            self.income_class = None              #if boolean is off, dont use income class
+        self.subsidy = subsidy # subsidy by government to allow the purchase of a higher flood protection than their current income class would typically allow.
 
 
-        self.base_likelihood = 0.5  ##base likelihood variable that will impact the chance to get adapted. The likelihood gets affected by the income class of a household.
-
-        ## to determine the likelihood per income class, for all the reasoning behind the chosen values see chapter ....
-        self.income_likelihood = {
-            'lower': 0.3,
-            'lower-middle': 0.4,
-            'middle': 0.5,
-            'upper-middle': 0.6,              # very likely to
-            'upper': 0.8                      # Super rich
-        }
+        # add an attribute here that is linked with the likihood to adapt, maybe based on education or knowledge on flood risk
 
 
         # getting flood map values
@@ -86,36 +97,28 @@ class Households(Agent):
 
 
 
-        if self.flood_damage_estimated > 0.15 and not self.is_adapted:
+        if self.flood_damage_estimated > 0.15 and not self.is_adapted:      ## change this so that the fact that one adapts or not is subject to flood risk knowledge
             self.in_danger = True
             if random.random() < 0.2:                     ##Orginal code
                 self.is_adapted = True
 
-        # This code makes agents adapted based on their likeliness, based on their income class, it is not good yet.
 
-        # if self.flood_damage_estimated > 0.15:
-        #     self.in_danger = True              #
-        #     if self.income_class in self.income_likelihood:
-        #         likelihood = self.income_likelihood[self.income_class]
-        #     else:
-        #         likelihood = self.base_likelihood
-        #
-        #     if likelihood + 0.5 > 1: #random.random() > 1:
-        #         self.is_adapted = True  # Agent adapts to flooding
-        # else:
-        #     self.is_adapted = False
 
-        if self.is_adapted and not self.final_adaption:
+
+        if self.is_adapted and not self.final_adaption:                                                 #verbinden met measure
             # Implement logic for buying protection based on income class and adaptation status
             if self.is_adapted:
                 if self.income_class == 'upper':
                     # Logic for upper income class to buy a certain protection
-                    self.buy_protection('high_protection')
+                    self.buy_protection('maximum_protection')
                 elif self.income_class == 'upper-middle':
                     # Logic for upper-middle income class to buy a certain protection
-                    self.buy_protection('medium_protection')
-                elif self.income_class in ['middle', 'lower-middle']:
+                    self.buy_protection('high_protection')
+                elif self.income_class == 'middle':
                     # Logic for middle and lower-middle income class to buy a certain protection
+                    self.buy_protection('medium_protection')
+                elif self.income_class == 'lower-middle':
+                    # Logic for lower-middle income class to buy a certain protection
                     self.buy_protection('basic_protection')
                 elif self.income_class == 'lower':
                     # Logic for lower income class to buy a certain protection
@@ -124,9 +127,19 @@ class Households(Agent):
                 # Logic for households that have not adapted
                 pass
 
-    def buy_protection(self, protection_type):
+    def buy_protection(self, protection_type):                                                #Baseren op literatuur
+        # Adjusting the logic to include possible subsidy by the government.
+        # Example: if subsidy is 1, the household can buy protection one level higher
+
+        income_classes = ['lower', 'lower-middle', 'middle', 'upper-middle', 'upper']  # available ino
+        # Finding the index of the current income class and apply the subsidy
+        current_index = income_classes.index(self.income_class)
+        new_index = min(current_index + self.subsidy, len(income_classes) - 1)
+        new_income_class = income_classes[new_index]
+
         # Define the percentage reduction in flood damage for each protection type
         damage_reduction = {
+            'maximum_protection': 0.60, # 75% reduction for extreme protection
             'high_protection': 0.50,  # 50% reduction for high protection
             'medium_protection': 0.35,  # 35% reduction for medium protection
             'basic_protection': 0.20,  # 20% reduction for basic protection
@@ -139,7 +152,7 @@ class Households(Agent):
         self.protection_type = protection_type
         # self.final_adaption = True
 
-    # def update_flood_damage(self):
+    # def update_flood_damage(self):                    # IF I DONT USE THIS AGAIN, REMOVE (not in base model, forgot what it was for)
     #     # Calculate the actual flood depth as a random number between 0.5 and 1.2 times the estimated flood depth
     #     self.flood_depth_actual = random.uniform(0.5, 1.2) * self.flood_depth_estimated
     #     # calculate the actual flood damage given the actual flood depth
@@ -154,11 +167,19 @@ class Government(Agent):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
 
+
+    def give_subsidies(self):
+        # defines the amount of subsidy the government gives each household
+        subsidy_amount = 1
+        for agent in self.model.schedule.agents:
+            if isinstance(agent,Households):
+                agent.subsidy += subsidy_amount
     def step(self):
-        # The government agent doesn't perform any actions.
-        pass
+        # for debugging, at step 1 the government gives the households a subsidy.
+        # if self.model.schedule.steps == 1:
+        #     self.give_subsidies()
 
 
         # if goverment does subsidies: move up all household agents classes by one class.
-
+        pass
 # More agent classes can be added here, e.g. for insurance agents.

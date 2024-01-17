@@ -13,6 +13,7 @@ import random
 
 # Import the agent class(es) from agents.py
 from agents import Households
+from agents import Government
 
 # Import functions from functions.py
 from functions import get_flood_map_data, calculate_basic_flood_damage
@@ -28,13 +29,13 @@ class AdaptationModel(Model):
 
     def __init__(self, 
                  seed = None,
-                 number_of_households = 25, # number of household agents
+                 number_of_households = 20, # number of household agents
                  # Simplified argument for choosing flood map. Can currently be "harvey", "100yr", or "500yr".
                  flood_map_choice='harvey',
                  # ### network related parameters ###
                  # The social network structure that is used.
                  # Can currently be "erdos_renyi", "barabasi_albert", "watts_strogatz", or "no_network"
-                 network = 'watts_strogatz',
+                 network = 'no_network', # 'watts_strogatz',
                  # likeliness of edge being created between two nodes
                  probability_of_network_connection = 0.4,
                  # number of edges for BA network
@@ -73,6 +74,13 @@ class AdaptationModel(Model):
             self.grid.place_agent(agent=household, node_id=node)
 
         # You might want to create other agents here, e.g. insurance agents.
+        # adding the possibility for a government to the setup, it gets its own node.
+        self.government = Government(unique_id="gov", model=self)
+        self.schedule.add(self.government)
+        gov_node = max(self.G.nodes()) + 1  # Create a new node ID
+        self.G.add_node(gov_node)  # Add the new node to the network
+        self.grid.place_agent(self.government, gov_node)  # Place the Government agent on the new node
+
 
         # Data collection setup to collect data
         model_metrics = {
@@ -93,12 +101,15 @@ class AdaptationModel(Model):
                         }
         #set up the data collector 
         self.datacollector = DataCollector(model_reporters=model_metrics, agent_reporters=agent_metrics)
-            
+
+
+
 
     def initialize_network(self):
         """
         Initialize and return the social network graph based on the provided network type using pattern matching.
         """
+        # i need to add something here such as total_nodes, so I can change all the networks, and use allof them
         if self.network == 'erdos_renyi':
             return nx.erdos_renyi_graph(n=self.number_of_households,
                                         p=self.number_of_nearest_neighbours / self.number_of_households,
@@ -112,9 +123,15 @@ class AdaptationModel(Model):
                                         k=self.number_of_nearest_neighbours,
                                         p=self.probability_of_network_connection,
                                         seed=self.seed)
+        # elif self.network == 'no_network':
+        #     G = nx.Graph()
+        #     G.add_nodes_from(range(self.number_of_households))
+        #     return G
         elif self.network == 'no_network':
             G = nx.Graph()
-            G.add_nodes_from(range(self.number_of_households))
+            total_nodes = self.number_of_households + 1  # Include the extra node for Government
+            for i in range(total_nodes):
+                G.add_node(i, agent=[])  # Initialize 'agent' key for each node
             return G
         else:
             raise ValueError(f"Unknown network type: '{self.network}'. "
@@ -203,9 +220,6 @@ class AdaptationModel(Model):
                 # calculate the actual flood damage given the actual flood depth
                 agent.flood_damage_actual = calculate_basic_flood_damage(agent.flood_depth_actual)
 
-                # if isinstance(agent, Households):
-                #     #call a method in the household class
-                #     agent.update_flood_damage()
         # Collect data and advance the model by one step
         self.datacollector.collect(self)
         self.schedule.step()

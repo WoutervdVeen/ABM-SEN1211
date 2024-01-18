@@ -35,7 +35,7 @@ class AdaptationModel(Model):
                  # ### network related parameters ###
                  # The social network structure that is used.
                  # Can currently be "erdos_renyi", "barabasi_albert", "watts_strogatz", or "no_network"
-                 network = 'no_network', # 'watts_strogatz',
+                 network = 'barabasi_albert', # 'watts_strogatz',
                  # likeliness of edge being created between two nodes
                  probability_of_network_connection = 0.4,
                  # number of edges for BA network
@@ -73,15 +73,6 @@ class AdaptationModel(Model):
             self.schedule.add(household)
             self.grid.place_agent(agent=household, node_id=node)
 
-        # You might want to create other agents here, e.g. insurance agents.
-        # adding the possibility for a government to the setup, it gets its own node.
-        self.government = Government(unique_id="gov", model=self)
-        self.schedule.add(self.government)
-        gov_node = max(self.G.nodes()) + 1  # Create a new node ID
-        self.G.add_node(gov_node)  # Add the new node to the network
-        self.grid.place_agent(self.government, gov_node)  # Place the Government agent on the new node
-
-
         # Data collection setup to collect data
         model_metrics = {
                         "total_adapted_households": self.total_adapted_households,
@@ -95,14 +86,17 @@ class AdaptationModel(Model):
                         "FloodDamageActual" : "flood_damage_actual",
                         "IncomeClass" : "income_class",
                         "IsAdapted": "is_adapted",
-                        "FriendsCount": lambda a: a.count_friends(radius=1),
+                        "FriendsCount": lambda a: a.count_friends(radius=2),
                         "location":"location",
                         # ... other reporters ...
                         }
         #set up the data collector 
         self.datacollector = DataCollector(model_reporters=model_metrics, agent_reporters=agent_metrics)
 
-
+        # Create the Government agent and add it to the schedule
+        # The Government agent is not associated with any node in the network
+        self.government = Government(unique_id="gov", model=self)
+        # self.schedule.add(self.government)
 
 
     def initialize_network(self):
@@ -123,15 +117,9 @@ class AdaptationModel(Model):
                                         k=self.number_of_nearest_neighbours,
                                         p=self.probability_of_network_connection,
                                         seed=self.seed)
-        # elif self.network == 'no_network':
-        #     G = nx.Graph()
-        #     G.add_nodes_from(range(self.number_of_households))
-        #     return G
         elif self.network == 'no_network':
             G = nx.Graph()
-            total_nodes = self.number_of_households + 1  # Include the extra node for Government
-            for i in range(total_nodes):
-                G.add_node(i, agent=[])  # Initialize 'agent' key for each node
+            G.add_nodes_from(range(self.number_of_households))
             return G
         else:
             raise ValueError(f"Unknown network type: '{self.network}'. "
@@ -203,6 +191,9 @@ class AdaptationModel(Model):
         estimated differently
         """
 
+        if self.schedule.steps == 1:           #so now the government gets executed, but it doesnt have to be added to the schedule,
+            self.government.step()
+
         for agent in self.schedule.agents:                                   #each step, the model checks if the agent is adapapted, if it is, it lowers the flood depth estimated and the flood damge estimated
             if agent.is_adapted and not agent.final_adaption:                #This results in a lower flood depth actual and eventually a lowre flood damge actual
                 agent.flood_depth_estimated *= (1 - agent.reduction)         # this means that investing in good floodadaptions lowers the damages.
@@ -216,7 +207,7 @@ class AdaptationModel(Model):
 
 
                 # Calculate the actual flood depth as a random number between 0.5 and 1.2 times the estimated flood depth
-                agent.flood_depth_actual = random.uniform(0.5, 1.2) * agent.flood_depth_estimated
+                agent.flood_depth_actual = random.uniform(0.8, 1.2) * agent.flood_depth_estimated                       #maybe make the range smaller #based on harvey, see repor
                 # calculate the actual flood damage given the actual flood depth
                 agent.flood_damage_actual = calculate_basic_flood_damage(agent.flood_depth_actual)
 

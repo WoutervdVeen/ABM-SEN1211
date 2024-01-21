@@ -1,9 +1,8 @@
-# Importing necessa
-#
-# ry libraries
+# Importing necessary libraries
 import networkx as nx
 from mesa import Model, Agent
 from mesa.time import RandomActivation
+from mesa.time import SimultaneousActivation
 from mesa.space import NetworkGrid
 from mesa.datacollection import DataCollector
 import geopandas as gpd
@@ -65,7 +64,8 @@ class AdaptationModel(Model):
         self.initialize_maps(flood_map_choice)
 
         # set schedule for agents
-        self.schedule = RandomActivation(self)  # Schedule for activating agents
+        # self.schedule = RandomActivation(self)  # Schedule for activating agents
+        self.schedule = SimultaneousActivation(self)              #changed so that agents make the choice on willingness with the same information. With RandomActivation some agents would make the choice later, giving them an advantage.
 
         # create households through initiating a household on each node of the network graph
         for i, node in enumerate(self.G.nodes()):
@@ -86,9 +86,12 @@ class AdaptationModel(Model):
                         "FloodDamageActual" : "flood_damage_actual",
                         "IncomeClass" : "income_class",
                         "IsAdapted": "is_adapted",
-                        "FriendsCount": lambda a: a.count_friends(radius=2),
-                        "location":"location",
-                        # ... other reporters ...
+                        # "FriendsCount": lambda a: a.count_friends(radius=2),            # REMOVE
+                        "Willingness": "willingness",
+                        "Awareness": "awareness",                                      # for DEBUGGING
+                        "Reduction": "reduction"                                        #for debugging
+                        # "location":"location",                                          # Maybe remove
+
                         }
         #set up the data collector 
         self.datacollector = DataCollector(model_reporters=model_metrics, agent_reporters=agent_metrics)
@@ -157,8 +160,33 @@ class AdaptationModel(Model):
         adapted_count = sum([1 for agent in self.schedule.agents if isinstance(agent, Households) and agent.is_adapted])
         return adapted_count
     
-    def plot_model_domain_with_agents(self):
-        fig, ax = plt.subplots()
+    # def plot_model_domain_with_agents(self):
+    #     fig, ax = plt.subplots()
+    #     # Plot the model domain
+    #     map_domain_gdf.plot(ax=ax, color='lightgrey')
+    #     # Plot the floodplain
+    #     floodplain_gdf.plot(ax=ax, color='lightblue', edgecolor='k', alpha=0.5)
+    #
+    #     # Collect agent locations and statuses
+    #     for agent in self.schedule.agents:
+    #         color = 'blue' if agent.is_adapted else 'red'
+    #         ax.scatter(agent.location.x, agent.location.y, color=color, s=10, label=color.capitalize() if not ax.collections else "")
+    #         ax.annotate(str(agent.unique_id), (agent.location.x, agent.location.y), textcoords="offset points", xytext=(0,1), ha='center', fontsize=9)
+    #     # Create legend with unique entries
+    #     handles, labels = ax.get_legend_handles_labels()
+    #     by_label = dict(zip(labels, handles))
+    #     ax.legend(by_label.values(), by_label.keys(), title="Red: not adapted, Blue: adapted")
+    #
+    #     # Customize plot with titles and labels
+    #     plt.title(f'Model Domain with Agents at Step {self.schedule.steps}')
+    #     plt.xlabel('Longitude')
+    #     plt.ylabel('Latitude')
+    #     plt.show()
+
+    ## TESTING CODE SIDE BY SIDE # REMOVE THIS OR ABOVE AT LATER STAGE
+    def plot_model_domain_with_agents(self, ax=None):
+        if ax is None:
+            fig, ax = plt.subplots()
         # Plot the model domain
         map_domain_gdf.plot(ax=ax, color='lightgrey')
         # Plot the floodplain
@@ -167,18 +195,20 @@ class AdaptationModel(Model):
         # Collect agent locations and statuses
         for agent in self.schedule.agents:
             color = 'blue' if agent.is_adapted else 'red'
-            ax.scatter(agent.location.x, agent.location.y, color=color, s=10, label=color.capitalize() if not ax.collections else "")
-            ax.annotate(str(agent.unique_id), (agent.location.x, agent.location.y), textcoords="offset points", xytext=(0,1), ha='center', fontsize=9)
+            ax.scatter(agent.location.x, agent.location.y, color=color, s=10,
+                       label=color.capitalize() if not ax.collections else "")
+            ax.annotate(str(agent.unique_id), (agent.location.x, agent.location.y), textcoords="offset points",
+                        xytext=(0, 1), ha='center', fontsize=9)
         # Create legend with unique entries
         handles, labels = ax.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
         ax.legend(by_label.values(), by_label.keys(), title="Red: not adapted, Blue: adapted")
 
         # Customize plot with titles and labels
-        plt.title(f'Model Domain with Agents at Step {self.schedule.steps}')
-        plt.xlabel('Longitude')
-        plt.ylabel('Latitude')
-        plt.show()
+        ax.set_title(f'Model Domain with Agents at Step {self.schedule.steps}')
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
+
 
     def step(self):
         """
@@ -191,8 +221,7 @@ class AdaptationModel(Model):
         estimated differently
         """
 
-        if self.schedule.steps == 1:           #so now the government gets executed, but it doesnt have to be added to the schedule,
-            self.government.step()
+        self.government.step()                                               # This way Government does not have to be added to the scheduler, as that results in model problem which are out of my programming level.
 
         for agent in self.schedule.agents:                                   #each step, the model checks if the agent is adapapted, if it is, it lowers the flood depth estimated and the flood damge estimated
             if agent.is_adapted and not agent.final_adaption:                #This results in a lower flood depth actual and eventually a lowre flood damge actual
@@ -205,11 +234,25 @@ class AdaptationModel(Model):
         if self.schedule.steps == 5:
             for agent in self.schedule.agents:
 
-
                 # Calculate the actual flood depth as a random number between 0.5 and 1.2 times the estimated flood depth
                 agent.flood_depth_actual = random.uniform(0.8, 1.2) * agent.flood_depth_estimated                       #maybe make the range smaller #based on harvey, see repor
                 # calculate the actual flood damage given the actual flood depth
                 agent.flood_damage_actual = calculate_basic_flood_damage(agent.flood_depth_actual)
+
+        # TESTER
+        # Calculate and print average willingness of all households
+        # total_willingness = 0
+        # household_count = 0
+        # for agent in self.schedule.agents:
+        #     if isinstance(agent, Households):
+        #         total_willingness += agent.willingness
+        #         household_count += 1
+        #
+        # if household_count > 0:
+        #     average_willingness = total_willingness / household_count
+        #     print(f"Average Willingness at Step {self.schedule.steps}: {average_willingness}")
+        # else:
+        #     print("No households to calculate average willingness.")
 
         # Collect data and advance the model by one step
         self.datacollector.collect(self)

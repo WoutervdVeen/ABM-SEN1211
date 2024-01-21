@@ -15,44 +15,22 @@ class Households(Agent):
     Each household has a flood depth attribute which is randomly assigned for demonstration purposes.
     In a real scenario, this would be based on actual geographical data or more complex logic.
     """
-
-    _income_classes_initialized = False
-    _income_class_list = []
-    _total_households = 20              # hard coded for now I want this to be a global, will do later
-
-    @classmethod                           # class method
-    def generate_income_class(cls):
-        if not cls._income_classes_initialized:
-            # Calculate the number of households for each income class        #distribution aanpassen naar gevonden waardes
-            distribution = {
-                'lower': 0.20,  # 20%
-                'lower-middle': 0.25,  # 25%
-                'middle': 0.25,  # 25%
-                'upper-middle': 0.15,  # 15%
-                'upper': 0.15   # 15%
-            }
-            income_distribution = []
-            for income_class, percentage in distribution.items():                #This function makes sure that the percentage per class is represented in the households.
-                count = int(percentage * cls._total_households)                  # But making a list and the popping, it is possible to create the wanted amount per class.
-                income_distribution.extend([income_class] * count)
-
-            random.shuffle(income_distribution)
-            cls._income_class_list = income_distribution
-            cls._income_classes_initialized = True
-
-        return cls._income_class_list.pop() if cls._income_class_list else 'default'
-
-    def __init__(self, unique_id, model, subsidy=0):
+    def __init__(self, unique_id, model):                # Remove unnecessary self.statements here, do i even need to do it here or is in the text also oke?
         super().__init__(unique_id, model)
-        self.income_class = Households.generate_income_class()                    # generates income class for each agent in a different function
-        self.willingness = 0                    #willingness to adapt starts of at 0, this can be affected by friends and awareness
-        self.awareness = random.uniform(0.2, 0.5)   #randomizer for the awareness of the household,
-        self.is_adapted = False  # Initial adaptation status set to False
-        self.final_adaption = False # this boolean makes sure that once an adaption has been made, it doesnt go on adapting again and again
-        self.reduction = 0
+        self.is_adapted = False
+        self.income_class = Households.generate_income_class()      # Generates income class for each agent in a different function
+        self.willingness = 0                                        # Willingness to adapt starts of at 0, this can be affected by friends and awareness
+        self.awareness = random.uniform(0.2, 1)               # Randomizer for the awareness of the household, class does not determine awareness.
+        self.final_adaption = False                                 # This boolean makes sure that once an adaption has been made, it doesnt go on adapting again and again
+        self.reduction = 0                                          # No initial reduction.
+        self.adapted_friends_percentage = 0                         # Initially the households have no friends that are adapetd, this needs to be an attribute so that it can be used to calculate willingness
+        self.subsidy = 0                                            # Intially there is no subsidy, Government can change this value to 1, this is not a Boolean so that the government could potentiall increase subsidy to 2
 
-        self.subsidy = subsidy # subsidy by government to allow the purchase of a higher flood protection than their current income class would typically allow.
-
+        if random.random() > 0.90:                                  # There is a 10 percent chance that a household is already adapted
+            self.is_adapted = True
+            self.initial_adaptation_setup()                         # Prior adapted households still need to get their bought protection, but adding this function (which is a but dubbel op) this can be assured.
+        else:
+            self.is_adapted = False  # Initial adaptation status set to False
 
         # add an attribute here that is linked with the likihood to adapt, maybe based on awareness or knowledge on flood risk
 
@@ -86,103 +64,166 @@ class Households(Agent):
         self.flood_damage_actual = calculate_basic_flood_damage(flood_depth=self.flood_depth_actual)
 
 
-    
-    # Function to count friends who can be influencial.
-    def count_friends(self, radius):             # add a max friends, so that not everyone is friends
-                                                # radius is 2, so friends of friends are also taken in to account.
-        """Count the number of neighbors within a given radius (number of edges away). This is social relation and not spatial"""
-        friends = self.model.grid.get_neighborhood(self.pos, include_center=False, radius=radius)
-        return len(friends)
+    _income_classes_initialized = False
+    _income_class_list = []
+    _total_households = 20              # hard coded for now I want this to be a global, will do later
 
-    def count_friends_new(self, radius):
+    @classmethod                           # class method
+    def generate_income_class(cls):
+        if not cls._income_classes_initialized:
+            # Calculate the number of households for each income class        #distribution aanpassen naar gevonden waardes
+            distribution = {
+                'lower': 0.20,  # 20%
+                'lower-middle': 0.25,  # 25%
+                'middle': 0.25,  # 25%
+                'upper-middle': 0.15,  # 15%
+                'upper': 0.15   # 15%
+            }
+            income_distribution = []
+            for income_class, percentage in distribution.items():                #This function makes sure that the percentage per class is represented in the households.
+                count = int(percentage * cls._total_households)                  # But making a list and the popping, it is possible to create the wanted amount per class.
+                income_distribution.extend([income_class] * count)
+
+            random.shuffle(income_distribution)
+            cls._income_class_list = income_distribution
+            cls._income_classes_initialized = True
+
+        return cls._income_class_list.pop() if cls._income_class_list else 'default'
+
+    def count_friends(self, radius):
+        """Count the number of adapted neighbors within a given radius."""
+        # at step 0, each Agent has no adapted friends, but due to the fact that the agent steps are executed one by one, agents that are executed later have a chance to have adapted friends.
+        # To mitigate the effect that this has on the calculatd willingness, agents will by activated Simultaneously (SimultaneousActivation) instead of Randomly (RandomActivation)
+        # Due to the fact that
+
+        # Retrieve all neighbor nodes within the specified radius
         neighbor_nodes = self.model.grid.get_neighborhood(self.pos, include_center=False, radius=radius)
 
         # Retrieve agents in these nodes
         neighbor_agents = [self.model.grid.get_cell_list_contents([node])[0] for node in neighbor_nodes]
 
-        # Check if there are any adapted neighbors
-        for agent in neighbor_agents:
-            if agent.is_adapted:
-                print("There is an adapted friend!")
-                break
+        # Count the number of adapted neighbors
+        adapted_friends_count = sum(agent.is_adapted for agent in neighbor_agents)
 
-        # """Count the number of adapted neighbors within a given radius."""
-        # # Retrieve all neighbor nodes within the specified radius
-        # neighbor_nodes = self.model.grid.get_neighborhood(self.pos, include_center=False, radius=radius)
-        #
-        # # Retrieve agents in these nodes
-        # neighbor_agents = [self.model.grid.get_cell_list_contents([node])[0] for node in neighbor_nodes]
-        #
-        # # Count the number of adapted neighbors
-        # adapted_friends_count = sum(agent.is_adapted for agent in neighbor_agents)
-        #
-        # # Calculate the total number of friends
-        # total_friends_count = len(neighbor_agents)
-        #
-        # # Calculate the percentage of adapted friends
-        # if total_friends_count > 0:
-        #     adapted_percentage = (adapted_friends_count / total_friends_count) * 100
-        # else:
-        #     adapted_percentage = 0
-        # print(adapted_percentage)
-        # return adapted_percentage
+        # Calculate the total number of friends
+        total_friends_count = len(neighbor_agents)
 
-    def friend_influence(self):
+        # Calculate the percentage of adapted friends
+        if total_friends_count > 0:
+            self.adapted_friends_percentage = (adapted_friends_count / total_friends_count)       # the attribute of a household will now be changed in to a percentage
+        else:
+            adapted_percentage = 0
 
-        # formule afhankelijk van percentage vrienden die zijn adapted
+
+    def calculate_friend_influence(self):
+        # the percentage of friends who are adapted influences the willingess, a lot of adapted friends increase the willingness with 2 points, more than half is 1 point etc.
+        if self.adapted_friends_percentage > 0.75:                       # if all almost all youre friends are adapting to floodrisk you will want to do it too ( see report)
+            return 2  # High Positive influence
+        elif self.adapted_friends_percentage >= 0.50:
+            return 1  # Positive influence
+        elif self.adapted_friends_percentage < 0.50:
+            return -1
+        elif self.adapted_friends_percentage > 0.25:                     # if none of your friends are adapting to floodrisk, you will not be likely to make this investment.
+            return -2  # Low influence
+        else:
+            return 0  # No influence
+
+    def calculate_flood_damage_estimated_influence(self):
+        if self.flood_damage_estimated >= 0.68:              # this damage factor is equal to a water depth of 1.5 meter (see report)
+            return 3 # high positive influence
+        elif self.flood_damage_estimated >= 0.58:            # this damage factor is equal to 1 meter water depth
+            return 2 # medium influence
+        elif self.flood_damage_estimated >= 0.20:             # this damage factor is equal to water depth higher than 0 -> so a base risk
+            return 1 # influence
+        else:
+            return 0 # little to no risk -> no influence
+
+    def calculate_awareness_influence(self):
+        #how mare aware a household is of floods and the dangers, the more a household will be willing
+        # awareness is hightened by government class with their awareness campaign.
+        # this method means that a household has a chance of 1/8 exceeding the maximum awarness and reaping the max benfits of the  awareness.
+        if self.awareness >= 0.8:
+            return 2
+        elif self.awareness >=0.50:
+            return 1
+        else:
+            return 0 # awareness is not high enough to influence the willingness
 
 
         pass
     def calculate_willingness(self):
         """" willingness is calculated with the awareness, the network and estimated_flood_damage"""
-        # having friends will make it more likely willingness
-        self.willingness = (self.flood_damage_estimated) * 2 + self.awareness + 1
+        # A Households willingness to adapt is influenced by three factors: estimated flood damages, how many of their friends are adapted and how aware the household is of the floodrisk
+        # -> see report
 
+        friend_influence = self.calculate_friend_influence()
+        damage_influence = self.calculate_flood_damage_estimated_influence()
+        awareness_influence = self.calculate_awareness_influence()
+        self.willingness = friend_influence + damage_influence + awareness_influence
 
+        # print(f"Agent {self.unique_id} is_adapted: {self.is_adapted} friends:{friend_influence}, damage:{damage_influence}, awareness:{awareness_influence}           total willingness: {self.willingness}")
 
     def buy_protection(self, protection_type):                                                #Baseren op literatuur
-        # Adjusting the logic to include possible subsidy by the government.
-        # Example: if subsidy is 1, the household can buy protection one level higher
+        # Household buys damage reduction according to its income class, if subsidy = 1 a household buys a damage reduction a class higher.
 
-        income_classes = ['lower', 'lower-middle', 'middle', 'upper-middle', 'upper']  # available ino
-        # Finding the index of the current income class and apply the subsidy                           ## nog niet af, subsidy
-        current_index = income_classes.index(self.income_class)
-        new_index = min(current_index + self.subsidy, len(income_classes) - 1)
-        new_income_class = income_classes[new_index]
+        # Adjust the protection type if subsidy is provided
+        if self.subsidy == 1:
+            # Define a mapping from one protection type to a higher one
+            upgrade_mapping = {
+                'minimal_protection': 'basic_protection',
+                'basic_protection': 'medium_protection',
+                'medium_protection': 'high_protection',
+                'high_protection': 'maximum_protection',
+                'maximum_protection': 'maximum_protection'  # already the highest level
+            }
+            # Upgrade the protection type
+            protection_type = upgrade_mapping.get(protection_type, protection_type)
+
 
         # Define the percentage reduction in flood damage for each protection type
         damage_reduction = {
             'maximum_protection': 0.60, # 75% reduction for extreme protection
-            'high_protection': 0.50,  # 50% reduction for high protection
+            'high_protection': 0.50,    # 50% reduction for high protection
             'medium_protection': 0.35,  # 35% reduction for medium protection
-            'basic_protection': 0.20,  # 20% reduction for basic protection
+            'basic_protection': 0.20,   # 20% reduction for basic protection
             'minimal_protection': 0.10  # 10% reduction for minimal protection
         }
+
+
 
         self.reduction = damage_reduction.get(protection_type, 0)
 
         # Set the protection type
         self.protection_type = protection_type
-        # self.final_adaption = True
+
+    def initial_adaptation_setup(self):                                                         #possibly uneccesarry
+
+        if self.is_adapted == True:
+            # Determine the protection type based on the income class and subsidy
+            if self.income_class == 'upper':
+                self.buy_protection('maximum_protection')
+            elif self.income_class == 'upper-middle':
+                self.buy_protection('high_protection')
+            elif self.income_class == 'middle':
+                self.buy_protection('medium_protection')
+            elif self.income_class == 'lower-middle':
+                self.buy_protection('basic_protection')
+            elif self.income_class == 'lower':
+                self.buy_protection('minimal_protection')
 
     def step(self):
-        # Logic for adaptation based on estimated flood damage and a random chance.
-        # These conditions are examples and should be refined for real-world applications.
 
+        self.count_friends(2)  # use last steps percentage of adapted friends, otherwise certain households have an unfair advantage
+        self.calculate_willingness()  # goes to the calculate willingness
 
-        self.count_friends_new(2)
-
-        self.calculate_willingness()            #goes to the calcualte willingness
-
-        if self.willingness >= 1:
-            if random.random() < 0.2:                     # There is always a chance that someone doesnt adapt, eventhough they are willing.
-                self.is_adapted = True
-
+        if self.willingness >= 3:                                      # this is subject to change
+            # if random.random() < 0.85:    add later when im sure the model is working properly        #0.2         # There is always a 15% chance that someone doesnt adapt, eventhough they are willing. ->REPORT-WRITE
+            self.is_adapted = True
 
         if self.is_adapted and not self.final_adaption:                                                 #verbinden met measure
             # Implement logic for buying protection based on income class and adaptation status
             if self.is_adapted:
-                if self.income_class == 'upper':
+                if self.income_class == 'upper':# or (self.income_class == 'upper-middle' and self.subsidy == 1):              #REMOVE THIS LINE IF THE OTHER SUBSIDY WORKS
                     # Logic for upper income class to buy a certain protection
                     self.buy_protection('maximum_protection')
                 elif self.income_class == 'upper-middle':
@@ -202,34 +243,57 @@ class Households(Agent):
                 pass
 
 
-
-
+# ************************************************************************************** #
+# ************************************************************************************** #
 # **************************  --- RESUABLE BUILDING BLOCK --- ************************** #
+# ************************************************************************************** #
+# ************************************************************************************** #
+
+
+
 class Government(Agent):             # make this a function.
     """
-    A government agent that currently doesn't perform any actions.
+    A government agent that has two possible actions: Subsidizing (1) and Awareness Campaign (2)
     """
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
 
 
-    def give_subsidies(self):                                                       ## AFMAKEN komt later
+    def give_subsidies(self):
+        '''Government Action1: Subsidize Flood adaptations, giving houeholds money so that they can purchase better flood adaptations'''
         # defines the amount of subsidy the government gives each household
-        subsidy_amount = 1
+        # if goverment does subsidies: move up all household agents classes by one class.
+        subsidy_amount = 1         # will vary between 1 and 2 in experiments
+
         for agent in self.model.schedule.agents:
             if isinstance(agent,Households):
                 agent.subsidy += subsidy_amount
 
+        pass
 
     def awareness_campaign(self):   # only works one step later,
-
+        '''Goverment Action 2: Awareness Campaign, informing households on floodrisks and stimulating them to take action and adapt.'''
+        #Increase the awareness of each household by a random value between 0 and 1
+        # so in the end, a households awareness is decided by the addition of two randomly generated values between 0 and 1                      -> REPORT-WRITE
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, Households):
+                increase = random.uniform(0,1)
+                agent.awareness = agent.awareness + increase
+                # agent.awareness = min(agent.awareness + increase, 1)  # so that it doesnt exceed 1   add later
         pass
+
     def step(self):
-        # for debugging, at step 1 the government gives the households a subsidy.
-        # if self.model.schedule.steps == 1:
-        #     self.give_subsidies()
 
+        if self.model.schedule.steps == 0:              # households that are already adapted are too late for the subsidy and thus dont get it.
+            self.give_subsidies()
 
-
-        # if goverment does subsidies: move up all household agents classes by one class.
+        if self.model.schedule.steps == 2:
+            self.awareness_campaign()
         pass
+
+
+# ************************************************************************************** #
+# ************************************************************************************** #
+# **************************  --- RESUABLE BUILDING BLOCK --- ************************** #
+# ************************************************************************************** #
+# ************************************************************************************** #

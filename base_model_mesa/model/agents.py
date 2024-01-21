@@ -216,7 +216,7 @@ class Households(Agent):
         self.count_friends(2)  # use last steps percentage of adapted friends, otherwise certain households have an unfair advantage
         self.calculate_willingness()  # goes to the calculate willingness
 
-        if self.willingness >= 3:                                      # this is subject to change
+        if self.willingness >= 3:                                      # this is subject to change ## HERCHECKEN -> dicht bij gemiddelde
             # if random.random() < 0.85:    add later when im sure the model is working properly        #0.2         # There is always a 15% chance that someone doesnt adapt, eventhough they are willing. ->REPORT-WRITE
             self.is_adapted = True
 
@@ -253,14 +253,14 @@ class Households(Agent):
 
 class Government(Agent):             # make this a function.
     """
-    A government agent that has two possible actions: Subsidizing (1) and Awareness Campaign (2)
+    A government agent that has two possible actions: Subsidizing (A) and Awareness Campaign (B)
     """
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
 
 
     def give_subsidies(self):
-        '''Government Action1: Subsidize Flood adaptations, giving houeholds money so that they can purchase better flood adaptations'''
+        '''Government Action A: Subsidize Flood adaptations, giving houeholds money so that they can purchase better flood adaptations'''
         # defines the amount of subsidy the government gives each household
         # if goverment does subsidies: move up all household agents classes by one class.
         subsidy_amount = 1         # will vary between 1 and 2 in experiments
@@ -272,7 +272,7 @@ class Government(Agent):             # make this a function.
         pass
 
     def awareness_campaign(self):   # only works one step later,
-        '''Goverment Action 2: Awareness Campaign, informing households on floodrisks and stimulating them to take action and adapt.'''
+        '''Goverment Action B: Awareness Campaign, informing households on floodrisks and stimulating them to take action and adapt.'''
         #Increase the awareness of each household by a random value between 0 and 1
         # so in the end, a households awareness is decided by the addition of two randomly generated values between 0 and 1                      -> REPORT-WRITE
         for agent in self.model.schedule.agents:

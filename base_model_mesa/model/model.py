@@ -222,7 +222,7 @@ class AdaptationModel(Model):
         """
 
         self.government.step()                                               # This way Government does not have to be added to the scheduler, as that results in model problem which are out of my programming level.
-
+                                                                             # because this is simpel it makes it an RBB
         for agent in self.schedule.agents:                                   #each step, the model checks if the agent is adapapted, if it is, it lowers the flood depth estimated and the flood damge estimated
             if agent.is_adapted and not agent.final_adaption:                #This results in a lower flood depth actual and eventually a lowre flood damge actual
                 agent.flood_depth_estimated *= (1 - agent.reduction)         # this means that investing in good floodadaptions lowers the damages.

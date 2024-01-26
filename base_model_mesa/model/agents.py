@@ -17,16 +17,20 @@ class Households(Agent):
     """
     def __init__(self, unique_id, model):                # Remove unnecessary self.statements here, do i even need to do it here or is in the text also oke?
         super().__init__(unique_id, model)
+        self.random_generator = random.Random(model.seed)           # setting the seed to the seed set in the model initialization
         self.is_adapted = False
         self.income_class = Households.generate_income_class()      # Generates income class for each agent in a different function
         self.willingness = 0                                        # Willingness to adapt starts of at 0, this can be affected by friends and awareness
-        self.awareness = random.uniform(0.2, 1)               # Randomizer for the awareness of the household, class does not determine awareness.
+        self.awareness = self.random_generator.uniform(0.2, 1)               # Randomizer for the awareness of the household, class does not determine awareness.
         self.final_adaption = False                                 # This boolean makes sure that once an adaption has been made, it doesnt go on adapting again and again
         self.reduction = 0                                          # No initial reduction.
         self.adapted_friends_percentage = 0                         # Initially the households have no friends that are adapetd, this needs to be an attribute so that it can be used to calculate willingness
         self.subsidy = 0                                            # Intially there is no subsidy, Government can change this value to 1, this is not a Boolean so that the government could potentiall increase subsidy to 2
 
-        if random.random() > 0.90:                                  # There is a 10 percent chance that a household is already adapted
+
+        unique_seed = model.seed + unique_id                        # so that each agent is individually randomized to be adapted in the next code
+        self.local_random = random.Random(unique_seed)
+        if self.local_random.random() > 0.90:                                  # There is a 10 percent chance that a household is already adapted
             self.is_adapted = True
             self.initial_adaptation_setup()                         # Prior adapted households still need to get their bought protection, but adding this function (which is a but dubbel op) this can be assured.
         else:
@@ -37,7 +41,7 @@ class Households(Agent):
 
         # getting flood map values
         # Get a random location on the map
-        loc_x, loc_y = generate_random_location_within_map_domain()
+        loc_x, loc_y = generate_random_location_within_map_domain(model.seed, self.unique_id)       #generates a location with the random unique to respect the seed
         self.location = Point(loc_x, loc_y)
 
         # Check whether the location is within floodplain
@@ -66,7 +70,7 @@ class Households(Agent):
 
     _income_classes_initialized = False
     _income_class_list = []
-    _total_households = 20              # hard coded for now I want this to be a global, will do later
+    _total_households = 80              # hard coded for now I want this to be a global, will do later
 
     @classmethod                           # class method
     def generate_income_class(cls):
@@ -84,7 +88,13 @@ class Households(Agent):
                 count = int(percentage * cls._total_households)                  # But making a list and the popping, it is possible to create the wanted amount per class.
                 income_distribution.extend([income_class] * count)
 
-            random.shuffle(income_distribution)
+            # # Create a local random generator for this method
+            # local_random = random.Random(seed)
+            #
+            # # Shuffle the income distribution list using the local random generator
+            # local_random.shuffle(income_distribution)
+
+            # random.shuffle(income_distribution)
             cls._income_class_list = income_distribution
             cls._income_classes_initialized = True
 
@@ -129,12 +139,14 @@ class Households(Agent):
             return 0  # No influence
 
     def calculate_flood_damage_estimated_influence(self):
-        if self.flood_damage_estimated >= 0.68:              # this damage factor is equal to a water depth of 1.5 meter (see report)
+        if self.flood_damage_estimated >= 0.68:                  # this damage factor is equal to a water depth of 1.5 meter (see report)
             return 3 # high positive influence
-        elif self.flood_damage_estimated >= 0.58:            # this damage factor is equal to 1 meter water depth
+        elif self.flood_damage_estimated >= 0.58:                # this damage factor is equal to 1 meter water depth
             return 2 # medium influence
-        elif self.flood_damage_estimated >= 0.20:             # this damage factor is equal to water depth higher than 0 -> so a base risk
+        elif self.flood_damage_estimated >= 0.20:                # this damage factor is equal to water depth higher than 0 -> so a base risk
             return 1 # influence
+        elif self.flood_damage_estimated == 0:                   # if there is no flood damage estimated, then it is highly unlikely a household will adapt
+            return -2
         else:
             return 0 # little to no risk -> no influence
 
@@ -257,6 +269,8 @@ class Government(Agent):             # make this a function.
     """
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
+        self.gov_action_A_sub = True,
+        self.gov_action_B_awa = True,
 
 
     def give_subsidies(self):
@@ -277,19 +291,24 @@ class Government(Agent):             # make this a function.
         # so in the end, a households awareness is decided by the addition of two randomly generated values between 0 and 1                      -> REPORT-WRITE
         for agent in self.model.schedule.agents:
             if isinstance(agent, Households):
-                increase = random.uniform(0,1)
+                unique_seed = self.model.seed + agent.unique_id
+                local_random = random.Random(unique_seed)
+
+                increase = local_random.uniform(0,1)
                 agent.awareness = agent.awareness + increase
                 # agent.awareness = min(agent.awareness + increase, 1)  # so that it doesnt exceed 1   add later
         pass
 
     def step(self):
 
-        if self.model.schedule.steps == 0:              # households that are already adapted are too late for the subsidy and thus dont get it.
-            self.give_subsidies()
+        if self.gov_action_A_sub:                           #
+            if self.model.schedule.steps == 0:              # households that are already adapted are too late for the subsidy and thus dont get it.
+                self.give_subsidies()
 
-        if self.model.schedule.steps == 2:
-            self.awareness_campaign()
-        pass
+        if self.gov_action_B_awa:                      #boolean to turn on and off,
+            if self.model.schedule.steps == 3:              #
+                self.awareness_campaign()
+            pass
 
 
 # ************************************************************************************** #

@@ -26,15 +26,16 @@ class AdaptationModel(Model):
     simulates their behavior, and collects data. The network type can be adjusted based on study requirements.
     """
 
+
     def __init__(self, 
-                 seed = None,
-                 number_of_households = 20, # number of household agents
+                 seed = 1, #None            # seed set as 1 for now
+                 number_of_households = 80, # number of household agents
                  # Simplified argument for choosing flood map. Can currently be "harvey", "100yr", or "500yr".
                  flood_map_choice='harvey',
                  # ### network related parameters ###
                  # The social network structure that is used.
                  # Can currently be "erdos_renyi", "barabasi_albert", "watts_strogatz", or "no_network"
-                 network = 'barabasi_albert', # 'watts_strogatz',
+                 network = 'barabasi_albert',
                  # likeliness of edge being created between two nodes
                  probability_of_network_connection = 0.4,
                  # number of edges for BA network
@@ -75,8 +76,10 @@ class AdaptationModel(Model):
 
         # Data collection setup to collect data
         model_metrics = {
-                        "total_adapted_households": self.total_adapted_households,
-                        # ... other reporters ...
+                        "percentage_adapted_households": self.total_adapted_households,
+                        "Average flood damage estimated": self.calculate_average_flood_damage_estimated,
+                        "Average flood damage actual": self.calculate_average_flood_damage_actual,
+
                         }
         
         agent_metrics = {
@@ -86,10 +89,10 @@ class AdaptationModel(Model):
                         "FloodDamageActual" : "flood_damage_actual",
                         "IncomeClass" : "income_class",
                         "IsAdapted": "is_adapted",
-                        # "FriendsCount": lambda a: a.count_friends(radius=2),            # REMOVE
-                        "Willingness": "willingness",
-                        "Awareness": "awareness",                                      # for DEBUGGING
-                        "Reduction": "reduction"                                        #for debugging
+                        #"FriendsCount": "total_friends_count",            # REMOVE
+                        #"Willingness": "willingness",
+                        #"Awareness": "awareness",                                      # for DEBUGGING
+                        #"Reduction": "reduction"                                        #for debugging
                         # "location":"location",                                          # Maybe remove
 
                         }
@@ -158,32 +161,22 @@ class AdaptationModel(Model):
         """Return the total number of households that have adapted."""
         #BE CAREFUL THAT YOU MAY HAVE DIFFERENT AGENT TYPES SO YOU NEED TO FIRST CHECK IF THE AGENT IS ACTUALLY A HOUSEHOLD AGENT USING "ISINSTANCE"
         adapted_count = sum([1 for agent in self.schedule.agents if isinstance(agent, Households) and agent.is_adapted])
-        return adapted_count
-    
-    # def plot_model_domain_with_agents(self):
-    #     fig, ax = plt.subplots()
-    #     # Plot the model domain
-    #     map_domain_gdf.plot(ax=ax, color='lightgrey')
-    #     # Plot the floodplain
-    #     floodplain_gdf.plot(ax=ax, color='lightblue', edgecolor='k', alpha=0.5)
-    #
-    #     # Collect agent locations and statuses
-    #     for agent in self.schedule.agents:
-    #         color = 'blue' if agent.is_adapted else 'red'
-    #         ax.scatter(agent.location.x, agent.location.y, color=color, s=10, label=color.capitalize() if not ax.collections else "")
-    #         ax.annotate(str(agent.unique_id), (agent.location.x, agent.location.y), textcoords="offset points", xytext=(0,1), ha='center', fontsize=9)
-    #     # Create legend with unique entries
-    #     handles, labels = ax.get_legend_handles_labels()
-    #     by_label = dict(zip(labels, handles))
-    #     ax.legend(by_label.values(), by_label.keys(), title="Red: not adapted, Blue: adapted")
-    #
-    #     # Customize plot with titles and labels
-    #     plt.title(f'Model Domain with Agents at Step {self.schedule.steps}')
-    #     plt.xlabel('Longitude')
-    #     plt.ylabel('Latitude')
-    #     plt.show()
+        percentage_adapted_count = adapted_count / self.number_of_households
+        return percentage_adapted_count
 
-    ## TESTING CODE SIDE BY SIDE # REMOVE THIS OR ABOVE AT LATER STAGE
+    def calculate_average_flood_damage_actual(self):
+        """Returns the average damage households"""
+        average_flood_damage_actual = sum(agent.flood_damage_actual for agent in self.schedule.agents)
+        num_agents = self.schedule.get_agent_count()
+        return average_flood_damage_actual / num_agents if num_agents > 0 else 0
+
+    def calculate_average_flood_damage_estimated(self):
+         """Returns the average damage estimated households"""
+         average_flood_damage_estimated = sum(agent.flood_damage_estimated for agent in self.schedule.agents)
+         num_agents = self.schedule.get_agent_count()
+         return average_flood_damage_estimated / num_agents if num_agents > 0 else 0
+
+
     def plot_model_domain_with_agents(self, ax=None):
         if ax is None:
             fig, ax = plt.subplots()
@@ -231,7 +224,7 @@ class AdaptationModel(Model):
             else:
                 continue
 
-        if self.schedule.steps == 5:
+        if self.schedule.steps == 5:     #5
             for agent in self.schedule.agents:
 
                 # Calculate the actual flood depth as a random number between 0.5 and 1.2 times the estimated flood depth

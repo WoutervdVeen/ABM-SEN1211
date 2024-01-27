@@ -5,6 +5,7 @@ from mesa.time import RandomActivation
 from mesa.time import SimultaneousActivation
 from mesa.space import NetworkGrid
 from mesa.datacollection import DataCollector
+from mesa.batchrunner import BatchRunner
 import geopandas as gpd
 import rasterio as rs
 import matplotlib.pyplot as plt
@@ -28,8 +29,8 @@ class AdaptationModel(Model):
 
 
     def __init__(self, 
-                 seed = 1, #None            # seed set as 1 for now
-                 number_of_households = 80, # number of household agents
+                 seed = 100, #None            # seed set as 1 for now
+                 number_of_households = 100, # number of household agents
                  # Simplified argument for choosing flood map. Can currently be "harvey", "100yr", or "500yr".
                  flood_map_choice='harvey',
                  # ### network related parameters ###
@@ -42,6 +43,8 @@ class AdaptationModel(Model):
                  number_of_edges = 3,
                  # number of nearest neighbours for WS social network
                  number_of_nearest_neighbours = 5,
+                 gov_action_A_sub = False,                     #setting government actions
+                 gov_action_B_awa = False                      #setting government actions
                  ):
         
         super().__init__(seed = seed)
@@ -68,6 +71,9 @@ class AdaptationModel(Model):
         # self.schedule = RandomActivation(self)  # Schedule for activating agents
         self.schedule = SimultaneousActivation(self)              #changed so that agents make the choice on willingness with the same information. With RandomActivation some agents would make the choice later, giving them an advantage.
 
+        self.gov_action_A_sub = gov_action_A_sub
+        self.gov_action_B_awa = gov_action_B_awa
+
         # create households through initiating a household on each node of the network graph
         for i, node in enumerate(self.G.nodes()):
             household = Households(unique_id=i, model=self)
@@ -91,9 +97,10 @@ class AdaptationModel(Model):
                         "IsAdapted": "is_adapted",
                         #"FriendsCount": "total_friends_count",            # REMOVE
                         #"Willingness": "willingness",
-                        #"Awareness": "awareness",                                      # for DEBUGGING
+                        "Awareness": "awareness",                                      # for DEBUGGING
                         #"Reduction": "reduction"                                        #for debugging
                         # "location":"location",                                          # Maybe remove
+                        "Subsidy":"subsidy"
 
                         }
         #set up the data collector 
@@ -227,8 +234,10 @@ class AdaptationModel(Model):
         if self.schedule.steps == 5:     #5
             for agent in self.schedule.agents:
 
+                unique_seed = self.seed + agent.unique_id
+                local_random = random.Random(unique_seed)
                 # Calculate the actual flood depth as a random number between 0.5 and 1.2 times the estimated flood depth
-                agent.flood_depth_actual = random.uniform(0.8, 1.2) * agent.flood_depth_estimated                       #maybe make the range smaller #based on harvey, see repor
+                agent.flood_depth_actual = local_random.uniform(0.8, 1.2) * agent.flood_depth_estimated                       #maybe make the range smaller #based on harvey, see repor
                 # calculate the actual flood damage given the actual flood depth
                 agent.flood_damage_actual = calculate_basic_flood_damage(agent.flood_depth_actual)
 

@@ -30,8 +30,8 @@ def set_initial_values(input_data, parameter, seed):
     parameter_set = 0
     parameter_data = input_data.loc[(input_data.parameter == parameter)] # get the distribution of values for the specified parameter
     parameter_data = parameter_data.reset_index()
-    random.seed(seed)
-    random_parameter = random.randint(0,100) 
+    local_random = random.seed(seed)
+    random_parameter = local_random.randint(0,100)
     for i in range(len(parameter_data)):
         if i == 0:
             if random_parameter < parameter_data['value_for_input'][i]:
@@ -136,9 +136,9 @@ def get_position_flood(bound_l, bound_r, bound_t, bound_b, img, seed):
     x, y: location on the map
     row, col: location within the tif-file
     """
-    random.seed(seed)
-    x = random.randint(round(bound_l, 0), round(bound_r, 0))
-    y = random.randint(round(bound_b, 0), round(bound_t, 0))
+    local_random = random.random(seed)
+    x = local_random.randint(round(bound_l, 0), round(bound_r, 0))
+    y = local_random.randint(round(bound_b, 0), round(bound_t, 0))
     row, col = img.index(x, y)
     return x, y, row, col
 

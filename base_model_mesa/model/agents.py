@@ -17,7 +17,8 @@ class Households(Agent):
     """
     def __init__(self, unique_id, model):                # Remove unnecessary self.statements here, do i even need to do it here or is in the text also oke?
         super().__init__(unique_id, model)
-        self.random_generator = random.Random(model.seed)           # setting the seed to the seed set in the model initialization
+        unique_seed = model.seed + unique_id
+        self.random_generator = random.Random(unique_seed)           # setting the seed to the seed set in the model initialization
         self.is_adapted = False
         self.income_class = Households.generate_income_class()      # Generates income class for each agent in a different function
         self.willingness = 0                                        # Willingness to adapt starts of at 0, this can be affected by friends and awareness
@@ -70,23 +71,23 @@ class Households(Agent):
 
     _income_classes_initialized = False
     _income_class_list = []
-    _total_households = 80              # hard coded for now I want this to be a global, will do later
+    _total_households = 100              # hard coded for now I want this to be a global, will do later
 
     @classmethod                           # class method
     def generate_income_class(cls):
         if not cls._income_classes_initialized:
-            # Calculate the number of households for each income class        #distribution aanpassen naar gevonden waardes
+            # Calculate the number of households for each income class        #Distribution is based on literature, see report. Values have been rounded so that the model can be run.
             distribution = {
                 'lower': 0.20,  # 20%
-                'lower-middle': 0.25,  # 25%
-                'middle': 0.25,  # 25%
-                'upper-middle': 0.15,  # 15%
-                'upper': 0.15   # 15%
+                'lower-middle': 0.15,  # 25%
+                'middle': 0.30,  # 25%
+                'upper-middle': 0.30,  # 15%
+                'upper': 0.05   # 15%
             }
             income_distribution = []
             for income_class, percentage in distribution.items():                #This function makes sure that the percentage per class is represented in the households.
                 count = int(percentage * cls._total_households)                  # But making a list and the popping, it is possible to create the wanted amount per class.
-                income_distribution.extend([income_class] * count)
+                income_distribution.extend([income_class] * count)               # distribution hoeft niet gerandomiseerd te worden aangezien er met seeds experimenten worden gerunt, voor een gerandomiseerd model zou het wel van belang zijn.
 
             # # Create a local random generator for this method
             # local_random = random.Random(seed)
@@ -194,7 +195,7 @@ class Households(Agent):
 
         # Define the percentage reduction in flood damage for each protection type
         damage_reduction = {
-            'maximum_protection': 0.60, # 75% reduction for extreme protection
+            'maximum_protection': 0.60, # 60% reduction for extreme protection
             'high_protection': 0.50,    # 50% reduction for high protection
             'medium_protection': 0.35,  # 35% reduction for medium protection
             'basic_protection': 0.20,   # 20% reduction for basic protection
@@ -269,20 +270,20 @@ class Government(Agent):             # make this a function.
     """
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
-        self.gov_action_A_sub = True,
-        self.gov_action_B_awa = True,
+        self.gov_action_A_sub = model.gov_action_A_sub
+        self.gov_action_B_awa = model.gov_action_B_awa
 
 
     def give_subsidies(self):
         '''Government Action A: Subsidize Flood adaptations, giving houeholds money so that they can purchase better flood adaptations'''
         # defines the amount of subsidy the government gives each household
         # if goverment does subsidies: move up all household agents classes by one class.
-        subsidy_amount = 1         # will vary between 1 and 2 in experiments
+        subsidy_amount = 1 #1         # will vary between 1 and 2 in experiments
 
         for agent in self.model.schedule.agents:
-            if isinstance(agent,Households):
+            if isinstance(agent, Households):
                 agent.subsidy += subsidy_amount
-
+                print('giving sub')                  #remove later
         pass
 
     def awareness_campaign(self):   # only works one step later,
@@ -297,15 +298,16 @@ class Government(Agent):             # make this a function.
                 increase = local_random.uniform(0,1)
                 agent.awareness = agent.awareness + increase
                 # agent.awareness = min(agent.awareness + increase, 1)  # so that it doesnt exceed 1   add later
+                print('giving awa') # giving awareness          #remove later
         pass
 
     def step(self):
 
-        if self.gov_action_A_sub:                           #
+        if self.gov_action_A_sub == True:                           #
             if self.model.schedule.steps == 0:              # households that are already adapted are too late for the subsidy and thus dont get it.
                 self.give_subsidies()
 
-        if self.gov_action_B_awa:                      #boolean to turn on and off,
+        if self.gov_action_B_awa == True:                      #boolean to turn on and off,
             if self.model.schedule.steps == 3:              #
                 self.awareness_campaign()
             pass

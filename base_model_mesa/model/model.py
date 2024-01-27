@@ -5,7 +5,6 @@ from mesa.time import RandomActivation
 from mesa.time import SimultaneousActivation
 from mesa.space import NetworkGrid
 from mesa.datacollection import DataCollector
-from mesa.batchrunner import BatchRunner
 import geopandas as gpd
 import rasterio as rs
 import matplotlib.pyplot as plt
@@ -29,7 +28,7 @@ class AdaptationModel(Model):
 
 
     def __init__(self, 
-                 seed = 100, #None            # seed set as 1 for now
+                 seed = 1, #None            # seed set as 1 for now
                  number_of_households = 100, # number of household agents
                  # Simplified argument for choosing flood map. Can currently be "harvey", "100yr", or "500yr".
                  flood_map_choice='harvey',
@@ -90,17 +89,12 @@ class AdaptationModel(Model):
         
         agent_metrics = {
                         "FloodDepthEstimated": "flood_depth_estimated",
+                        "InitialFloodDamageEstimated": "initial_damage_estimated",
                         "FloodDamageEstimated" : "flood_damage_estimated",
                         "FloodDepthActual": "flood_depth_actual",
                         "FloodDamageActual" : "flood_damage_actual",
                         "IncomeClass" : "income_class",
                         "IsAdapted": "is_adapted",
-                        #"FriendsCount": "total_friends_count",            # REMOVE
-                        #"Willingness": "willingness",
-                        "Awareness": "awareness",                                      # for DEBUGGING
-                        #"Reduction": "reduction"                                        #for debugging
-                        # "location":"location",                                          # Maybe remove
-                        "Subsidy":"subsidy"
 
                         }
         #set up the data collector 
@@ -110,7 +104,6 @@ class AdaptationModel(Model):
         # The Government agent is not associated with any node in the network
         self.government = Government(unique_id="gov", model=self)
         # self.schedule.add(self.government)
-
 
     def initialize_network(self):
         """
@@ -226,7 +219,8 @@ class AdaptationModel(Model):
         for agent in self.schedule.agents:                                   #each step, the model checks if the agent is adapapted, if it is, it lowers the flood depth estimated and the flood damge estimated
             if agent.is_adapted and not agent.final_adaption:                #This results in a lower flood depth actual and eventually a lowre flood damge actual
                 agent.flood_depth_estimated *= (1 - agent.reduction)         # this means that investing in good floodadaptions lowers the damages.
-                agent.flood_damage_estimated *= (1 - agent.reduction)
+                agent.flood_damage_estimated = calculate_basic_flood_damage(flood_depth=agent.flood_depth_estimated)   #re calculate flood_damage_estimated based on the new flood_depth_estimated
+                #agent.flood_damage_estimated *= (1 - agent.reduction)
                 agent.final_adaption = True
             else:
                 continue
@@ -240,21 +234,6 @@ class AdaptationModel(Model):
                 agent.flood_depth_actual = local_random.uniform(0.8, 1.2) * agent.flood_depth_estimated                       #maybe make the range smaller #based on harvey, see repor
                 # calculate the actual flood damage given the actual flood depth
                 agent.flood_damage_actual = calculate_basic_flood_damage(agent.flood_depth_actual)
-
-        # TESTER
-        # Calculate and print average willingness of all households
-        # total_willingness = 0
-        # household_count = 0
-        # for agent in self.schedule.agents:
-        #     if isinstance(agent, Households):
-        #         total_willingness += agent.willingness
-        #         household_count += 1
-        #
-        # if household_count > 0:
-        #     average_willingness = total_willingness / household_count
-        #     print(f"Average Willingness at Step {self.schedule.steps}: {average_willingness}")
-        # else:
-        #     print("No households to calculate average willingness.")
 
         # Collect data and advance the model by one step
         self.datacollector.collect(self)

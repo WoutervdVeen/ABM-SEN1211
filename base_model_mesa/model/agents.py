@@ -57,9 +57,11 @@ class Households(Agent):
         # handle negative values of flood depth
         if self.flood_depth_estimated < 0:
             self.flood_depth_estimated = 0
-        
+
+
         # calculate the estimated flood damage given the estimated flood depth. Flood damage is a factor between 0 and 1
         self.flood_damage_estimated = calculate_basic_flood_damage(flood_depth=self.flood_depth_estimated)
+        self.initial_damage_estimated = self.flood_damage_estimated       #for the result analysis this is necessary.
 
         # Add an attribute for the actual flood depth. This is set to zero at the beginning of the simulation since there is not flood yet
         # and will update its value when there is a shock (i.e., actual flood). Shock happens at some point during the simulation
@@ -255,14 +257,11 @@ class Households(Agent):
                 # Logic for households that have not adapted
                 pass
 
-
 # ************************************************************************************** #
 # ************************************************************************************** #
 # **************************  --- RESUABLE BUILDING BLOCK --- ************************** #
 # ************************************************************************************** #
 # ************************************************************************************** #
-
-
 
 class Government(Agent):             # make this a function.
     """
@@ -278,12 +277,11 @@ class Government(Agent):             # make this a function.
         '''Government Action A: Subsidize Flood adaptations, giving houeholds money so that they can purchase better flood adaptations'''
         # defines the amount of subsidy the government gives each household
         # if goverment does subsidies: move up all household agents classes by one class.
-        subsidy_amount = 1 #1         # will vary between 1 and 2 in experiments
+        subsidy_amount = 1
 
         for agent in self.model.schedule.agents:
             if isinstance(agent, Households):
                 agent.subsidy += subsidy_amount
-                print('giving sub')                  #remove later
         pass
 
     def awareness_campaign(self):   # only works one step later,
@@ -297,8 +295,6 @@ class Government(Agent):             # make this a function.
 
                 increase = local_random.uniform(0,1)
                 agent.awareness = agent.awareness + increase
-                # agent.awareness = min(agent.awareness + increase, 1)  # so that it doesnt exceed 1   add later
-                print('giving awa') # giving awareness          #remove later
         pass
 
     def step(self):

@@ -15,6 +15,8 @@ class Households(Agent):
     Each household has a flood depth attribute which is randomly assigned for demonstration purposes.
     In a real scenario, this would be based on actual geographical data or more complex logic.
     """
+
+
     def __init__(self, unique_id, model):                # Remove unnecessary self.statements here, do i even need to do it here or is in the text also oke?
         super().__init__(unique_id, model)
         unique_seed = model.seed + unique_id
@@ -103,6 +105,8 @@ class Households(Agent):
 
         return cls._income_class_list.pop() if cls._income_class_list else 'default'
 
+
+
     def count_friends(self, radius):
         """Count the number of adapted neighbors within a given radius."""
         # at step 0, each Agent has no adapted friends, but due to the fact that the agent steps are executed one by one, agents that are executed later have a chance to have adapted friends.
@@ -137,7 +141,7 @@ class Households(Agent):
         elif self.adapted_friends_percentage < 0.50:
             return -1
         elif self.adapted_friends_percentage > 0.25:                     # if none of your friends are adapting to floodrisk, you will not be likely to make this investment.
-            return -2  # Low influence
+            return -1  # Low influence                 #-2 maar even experimenteren met -1
         else:
             return 0  # No influence
 
@@ -147,7 +151,7 @@ class Households(Agent):
         elif self.flood_damage_estimated >= 0.58:                # this damage factor is equal to 1 meter water depth
             return 2 # medium influence
         elif self.flood_damage_estimated >= 0.20:                # this damage factor is equal to water depth higher than 0 -> so a base risk
-            return 1 # influence
+            return 2 # influence
         elif self.flood_damage_estimated == 0:                   # if there is no flood damage estimated, then it is highly unlikely a household will adapt
             return -2
         else:
@@ -304,7 +308,7 @@ class Government(Agent):             # make this a function.
                 self.give_subsidies()
 
         if self.gov_action_B_awa == True:                      #boolean to turn on and off,
-            if self.model.schedule.steps == 3:              #
+            if self.model.schedule.steps == 5:              #3
                 self.awareness_campaign()
             pass
 

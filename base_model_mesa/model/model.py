@@ -47,7 +47,13 @@ class AdaptationModel(Model):
                  ):
         
         super().__init__(seed = seed)
-        
+
+
+        Households._income_classes_initialized = False            #need to reset at every model run, otherwise with the batch runner, where the kernel is not reset, households won't get an income class
+        Households._income_class_list = []
+        Households._total_households = number_of_households
+
+
         # defining the variables and setting the values
         self.number_of_households = number_of_households  # Total number of household agents
         self.seed = seed
@@ -82,6 +88,7 @@ class AdaptationModel(Model):
         # Data collection setup to collect data
         model_metrics = {
                         "percentage_adapted_households": self.total_adapted_households,
+                        "Average initial flood damage estimated" :self.calculate_average_initial_flood_damage_estimated,
                         "Average flood damage estimated": self.calculate_average_flood_damage_estimated,
                         "Average flood damage actual": self.calculate_average_flood_damage_actual,
 
@@ -104,6 +111,8 @@ class AdaptationModel(Model):
         # The Government agent is not associated with any node in the network
         self.government = Government(unique_id="gov", model=self)
         # self.schedule.add(self.government)
+
+
 
     def initialize_network(self):
         """
@@ -163,6 +172,12 @@ class AdaptationModel(Model):
         adapted_count = sum([1 for agent in self.schedule.agents if isinstance(agent, Households) and agent.is_adapted])
         percentage_adapted_count = adapted_count / self.number_of_households
         return percentage_adapted_count
+
+    def calculate_average_initial_flood_damage_estimated(self):
+
+        average_initial_flood_damage_estimated = sum(agent.initial_damage_estimated for agent in self.schedule.agents)
+        num_agents = self.schedule.get_agent_count()
+        return average_initial_flood_damage_estimated / num_agents if num_agents > 0 else 0
 
     def calculate_average_flood_damage_actual(self):
         """Returns the average damage households"""
@@ -225,7 +240,7 @@ class AdaptationModel(Model):
             else:
                 continue
 
-        if self.schedule.steps == 5:     #5
+        if self.schedule.steps == 10:     #5
             for agent in self.schedule.agents:
 
                 unique_seed = self.seed + agent.unique_id

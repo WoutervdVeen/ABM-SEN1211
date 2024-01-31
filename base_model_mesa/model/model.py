@@ -42,20 +42,20 @@ class AdaptationModel(Model):
                  number_of_edges = 3,
                  # number of nearest neighbours for WS social network
                  number_of_nearest_neighbours = 5,
-                 gov_action_A_sub = False,                     #setting government actions
-                 gov_action_B_awa = False                      #setting government actions
+                 gov_action_A_sub = False,                        # Setting government actions, turn to True to turn on Government Subisdy
+                 gov_action_B_awa = False                         # Setting government actions, turn to True to turn on Government Awareness Campaign
                  ):
         
         super().__init__(seed = seed)
 
 
-        Households._income_classes_initialized = False            #need to reset at every model run, otherwise with the batch runner, where the kernel is not reset, households won't get an income class
-        Households._income_class_list = []
-        Households._total_households = number_of_households
+        Households._income_classes_initialized = False            # Need to reset at every model run, otherwise with the batch runner, where the kernel is not reset, households won't get an income class
+        Households._income_class_list = []                        # Needed for the class function to operate properly in the batch runner
+        Households._total_households = number_of_households       # Aware that this not fantastic programming, but after trying to debug for multiple hours this was the solution to continue to the next steps.
 
 
         # defining the variables and setting the values
-        self.number_of_households = number_of_households  # Total number of household agents
+        self.number_of_households = number_of_households          # Total number of household agents
         self.seed = seed
 
         # network
@@ -87,7 +87,7 @@ class AdaptationModel(Model):
 
         # Data collection setup to collect data
         model_metrics = {
-                        "percentage_adapted_households": self.total_adapted_households,
+                        "percentage_adapted_households": self.total_adapted_households,                                         # Metrics that will be measured in for the final results
                         "Average initial flood damage estimated" :self.calculate_average_initial_flood_damage_estimated,
                         "Average flood damage estimated": self.calculate_average_flood_damage_estimated,
                         "Average flood damage actual": self.calculate_average_flood_damage_actual,
@@ -107,10 +107,9 @@ class AdaptationModel(Model):
         #set up the data collector 
         self.datacollector = DataCollector(model_reporters=model_metrics, agent_reporters=agent_metrics)
 
-        # Create the Government agent and add it to the schedule
         # The Government agent is not associated with any node in the network
-        self.government = Government(unique_id="gov", model=self)
-        # self.schedule.add(self.government)
+        self.government = Government(unique_id="gov", model=self)                                    # not adding the Government agent to the schedule, as this would disrupt the model. Using the Agent by calling it in model step works fine for this model.
+
 
 
 
@@ -174,7 +173,7 @@ class AdaptationModel(Model):
         return percentage_adapted_count
 
     def calculate_average_initial_flood_damage_estimated(self):
-
+        """Calculates average initial flood damge estimated, so that this can be used in the result analysis"""
         average_initial_flood_damage_estimated = sum(agent.initial_damage_estimated for agent in self.schedule.agents)
         num_agents = self.schedule.get_agent_count()
         return average_initial_flood_damage_estimated / num_agents if num_agents > 0 else 0
@@ -230,25 +229,22 @@ class AdaptationModel(Model):
         """
 
         self.government.step()                                               # This way Government does not have to be added to the scheduler, as that results in model problem which are out of my programming level.
-                                                                             # because this is simpel it makes it an RBB
-        for agent in self.schedule.agents:                                   #each step, the model checks if the agent is adapapted, if it is, it lowers the flood depth estimated and the flood damge estimated
-            if agent.is_adapted and not agent.final_adaption:                #This results in a lower flood depth actual and eventually a lowre flood damge actual
-                agent.flood_depth_estimated *= (1 - agent.reduction)         # this means that investing in good floodadaptions lowers the damages.
-                agent.flood_damage_estimated = calculate_basic_flood_damage(flood_depth=agent.flood_depth_estimated)   #re calculate flood_damage_estimated based on the new flood_depth_estimated
-                #agent.flood_damage_estimated *= (1 - agent.reduction)
+                                                                             # Because this is simpel it makes it an RBB
+        for agent in self.schedule.agents:                                   # Each step, the model checks if the agent is adapapted, if it is, it lowers the flood depth estimated and the flood damge estimated
+            if agent.is_adapted and not agent.final_adaption:                # This results in a lower flood depth actual and eventually a lowre flood damge actual
+                agent.flood_depth_estimated *= (1 - agent.reduction)         # This means that investing in good floodadaptions lowers the damages.
+                agent.flood_damage_estimated = calculate_basic_flood_damage(flood_depth=agent.flood_depth_estimated)   # Calculate flood_damage_estimated based on the new flood_depth_estimated
                 agent.final_adaption = True
             else:
                 continue
 
-        if self.schedule.steps == 10:     #5
+        if self.schedule.steps == 5:                                          # 5 years
             for agent in self.schedule.agents:
 
                 unique_seed = self.seed + agent.unique_id
                 local_random = random.Random(unique_seed)
-                # Calculate the actual flood depth as a random number between 0.5 and 1.2 times the estimated flood depth
-                agent.flood_depth_actual = local_random.uniform(0.8, 1.2) * agent.flood_depth_estimated                       #maybe make the range smaller #based on harvey, see repor
-                # calculate the actual flood damage given the actual flood depth
-                agent.flood_damage_actual = calculate_basic_flood_damage(agent.flood_depth_actual)
+                agent.flood_depth_actual = local_random.uniform(0.8, 1.2) * agent.flood_depth_estimated            # Calculates the actual flood depth as a random number between 0.8 and 1.2 times the estimated flood depth
+                agent.flood_damage_actual = calculate_basic_flood_damage(agent.flood_depth_actual)                       # Calculates the actual flood damage given the actual flood depth
 
         # Collect data and advance the model by one step
         self.datacollector.collect(self)

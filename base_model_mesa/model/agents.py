@@ -208,8 +208,7 @@ class Households(Agent):
         self.count_friends(2)  # use last steps percentage of adapted friends, otherwise certain households have an unfair advantage
         self.calculate_willingness()  # goes to the calculate willingness
 
-        if self.willingness >= 3:                                      # this is subject to change ## HERCHECKEN -> dicht bij gemiddelde
-            # if random.random() < 0.85:    add later when im sure the model is working properly        #0.2         # There is always a 15% chance that someone doesnt adapt, eventhough they are willing. ->REPORT-WRITE
+        if self.willingness >= 3:                                      # Breaking point for a Household to adapt is 3, the found average willingness of Households. There it is deemed to be a good breaking point.
             self.is_adapted = True
 
         if self.is_adapted and not self.final_adaption:                                                 #verbinden met measure
